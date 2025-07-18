@@ -6,6 +6,7 @@ class SettingsScreen extends StatefulWidget {
   final Function(bool) onToggleTheme;
   final ValueNotifier<double> goalNotifier;
   final ValueNotifier<List<int>> customSizesNotifier;
+  final ValueNotifier<int> intakeNotifier; // ✅ Add this
 
   const SettingsScreen({
     Key? key,
@@ -13,6 +14,7 @@ class SettingsScreen extends StatefulWidget {
     required this.onToggleTheme,
     required this.goalNotifier,
     required this.customSizesNotifier,
+    required this.intakeNotifier, // ✅ Pass it here
   }) : super(key: key);
 
   @override
@@ -66,10 +68,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _resetData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+
+    // Reset notifiers
     widget.goalNotifier.value = 2.0;
     widget.customSizesNotifier.value = [150, 250, 350];
+    widget.intakeNotifier.value = 0; // ✅ Make sure it updates immediately
+
     _goalController.text = "2.0";
+
     setState(() {});
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("All data has been reset.")),
     );
@@ -127,7 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         backgroundColor: bgColor,
         elevation: 0,
-        title: Text('Settings ', style: TextStyle(color: textColor)),
+        title: Text('Settings', style: TextStyle(color: textColor)),
         iconTheme: IconThemeData(color: textColor),
         actions: [
           IconButton(
@@ -240,11 +248,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ...[
-                  "✔ Boosts energy & relieves fatigue",
-                  "✔ Flushes out toxins from the body",
-                  "✔ Improves skin complexion",
-                  "✔ Helps maintain body temperature",
-                  "✔ Aids in digestion and weight loss",
+                  "⚡ Boosts energy & relieves fatigue",
+                  "🚰 Flushes out toxins from the body",
+                  "🌟 Improves skin complexion",
+                  "🌡️ Helps maintain body temperature",
+                  "🍽️ Aids in digestion and weight loss",
                 ].map((b) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(b, style: TextStyle(color: textColor)),
