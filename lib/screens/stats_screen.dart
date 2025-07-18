@@ -94,6 +94,7 @@ class _StatsScreenState extends State<StatsScreen> {
     final bgColor = isDark ? const Color(0xFF0A192F) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
     final cardColor = isDark ? const Color(0xFF1E2A47) : const Color(0xFFF2F9FF);
+    final size = MediaQuery.of(context).size;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -119,88 +120,97 @@ class _StatsScreenState extends State<StatsScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildCard(
-              title: "Current Streak",
-              value: _streak == 0 ? "0 days 🔥" : "$_streak days 🔥",
-              valueColor: _streak == 0 ? greyColor : fireColor,
-              textColor: textColor,
-              cardColor: cardColor,
-            ),
-            const SizedBox(height: 16),
-            _buildCard(
-              title: "Today's Intake",
-              value: "${widget.intakeNotifier.value} ml / ${(widget.goalNotifier.value * 1000).toInt()} ml",
-              valueColor: mainColor,
-              textColor: textColor,
-              cardColor: cardColor,
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height: 260,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: mainColor.withOpacity(0.2),
-                    blurRadius: 6,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-              ),
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  barTouchData: BarTouchData(enabled: false),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 40,
-                        getTitlesWidget: (value, _) => Text(
-                          value.toInt().toString(),
-                          style: TextStyle(color: textColor, fontSize: 12),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    _buildCard(
+                      title: "Current Streak",
+                      value: _streak == 0 ? "0 days 🔥" : "$_streak days 🔥",
+                      valueColor: _streak == 0 ? greyColor : fireColor,
+                      textColor: textColor,
+                      cardColor: cardColor,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildCard(
+                      title: "Today's Intake",
+                      value: "${widget.intakeNotifier.value} ml / ${(widget.goalNotifier.value * 1000).toInt()} ml",
+                      valueColor: mainColor,
+                      textColor: textColor,
+                      cardColor: cardColor,
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      height: size.height * 0.35,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: mainColor.withOpacity(0.2),
+                            blurRadius: 6,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
+                      ),
+                      child: BarChart(
+                        BarChartData(
+                          alignment: BarChartAlignment.spaceAround,
+                          barTouchData: BarTouchData(enabled: false),
+                          titlesData: FlTitlesData(
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 40,
+                                getTitlesWidget: (value, _) => Text(
+                                  value.toInt().toString(),
+                                  style: TextStyle(color: textColor, fontSize: 12),
+                                ),
+                              ),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, _) {
+                                  int index = value.toInt();
+                                  if (index >= 0 && index < _weekLabels.length) {
+                                    return Text(
+                                      _weekLabels[index],
+                                      style: TextStyle(
+                                        color: textColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ),
+                            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          ),
+                          borderData: FlBorderData(show: false),
+                          gridData: FlGridData(show: false),
+                          barGroups: List.generate(
+                            7,
+                                (i) => _barData(i, _weeklyIntake[i], mainColor),
+                          ),
                         ),
                       ),
                     ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, _) {
-                          int index = value.toInt();
-                          if (index >= 0 && index < _weekLabels.length) {
-                            return Text(
-                              _weekLabels[index],
-                              style: TextStyle(
-                                color: textColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ),
-                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  gridData: FlGridData(show: false),
-                  barGroups: List.generate(
-                    7,
-                        (i) => _barData(i, _weeklyIntake[i], mainColor),
-                  ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

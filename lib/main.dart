@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:watertracker11/services/notification_service.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/stats_screen.dart';
@@ -8,7 +7,6 @@ import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.init();
   runApp(const HydroBuddyApp());
 }
 
@@ -42,28 +40,7 @@ class _HydroBuddyAppState extends State<HydroBuddyApp> {
     final sizes = prefs.getStringList('customSizes')?.map(int.parse).toList();
     if (sizes != null) _customSizesNotifier.value = sizes;
 
-    final reminderEnabled = prefs.getBool('reminderEnabled') ?? false;
-    if (reminderEnabled) {
-      final reminderTimes = _loadReminderTimes(prefs);
-      if (reminderTimes.isNotEmpty) {
-        await NotificationService.scheduleMultipleReminders(
-          reminderTimes,
-          'Time to drink some water and stay hydrated! 💧',
-        );
-      }
-    } else {
-      await NotificationService.cancelAllReminders();
-    }
-
     setState(() {});
-  }
-
-  List<TimeOfDay> _loadReminderTimes(SharedPreferences prefs) {
-    final timeStrings = prefs.getStringList('reminderTimes') ?? ['08:00'];
-    return timeStrings.map((str) {
-      final parts = str.split(':');
-      return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-    }).toList();
   }
 
   void _toggleTheme(bool value) async {

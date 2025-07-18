@@ -1,3 +1,4 @@
+// Keep all imports the same
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -156,7 +157,6 @@ class _HomeScreenState extends State<HomeScreen>
     week[today] = ((_liters * 1000).toInt()).toString();
     await prefs.setStringList('week', week);
 
-    // Update streak map if goal is met
     double goal = widget.goalNotifier.value;
     if (_liters >= goal) {
       String todayKey = _formattedDate();
@@ -165,11 +165,9 @@ class _HomeScreenState extends State<HomeScreen>
       final streakString = prefs.getString('hydrationStreakMap');
       if (streakString != null && streakString.isNotEmpty) {
         for (var pair in streakString.split(';')) {
-          if (pair.contains(':')) {
-            final parts = pair.split(':');
-            if (parts.length == 2) {
-              streakMap[parts[0]] = parts[1];
-            }
+          final parts = pair.split(':');
+          if (parts.length == 2) {
+            streakMap[parts[0]] = parts[1];
           }
         }
       }
@@ -188,11 +186,10 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDarkTheme;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenSize = MediaQuery.of(context).size;
 
     final Color mainColor = const Color(0xFF2196F3);
     final Color bgColor = isDark ? const Color(0xFF0A192F) : Colors.white;
-    final Color appBarColor = bgColor;
     final Color textColor = isDark ? Colors.white : Colors.black;
 
     return ValueListenableBuilder<double>(
@@ -204,20 +201,11 @@ class _HomeScreenState extends State<HomeScreen>
         return Scaffold(
           backgroundColor: bgColor,
           appBar: AppBar(
+            backgroundColor: bgColor,
             elevation: 0,
-            backgroundColor: appBarColor,
-            titleSpacing: 16,
-            title: Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(
-                    text: 'Thirsty ',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
-                  ),
-                  const TextSpan(text: '', style: TextStyle(fontSize: 22)),
-                ],
-              ),
-              style: TextStyle(color: textColor),
+            title: Text(
+              'Thirsty',
+              style: TextStyle(color: textColor, fontSize: 22, fontWeight: FontWeight.bold),
             ),
             actions: [
               IconButton(
@@ -226,61 +214,66 @@ class _HomeScreenState extends State<HomeScreen>
                   color: textColor,
                 ),
                 onPressed: widget.onToggleTheme,
-                tooltip: "Toggle Theme",
               ),
             ],
-            iconTheme: IconThemeData(color: textColor),
           ),
           body: SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: _randomizeMessage,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text(
-                      _currentMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: mainColor,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Center(
-                  child: CustomPaint(
-                    size: Size(screenWidth * 0.4, screenWidth * 0.6),
-                    painter: DropletPainter(
-                      fillPercent: percent,
-                      wavePhase: _wavePhase,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double dropletSize = constraints.maxWidth * 0.4;
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Expanded(child: _buildInfoColumn("Today", "$ml ml", mainColor, isDark)),
-                      Expanded(child: _buildInfoColumn("Goal", "${(goal * 1000).toInt()} ml", mainColor, isDark)),
-                      Expanded(child: _buildInfoColumn("Progress", "${(percent * 100).toInt()}%", mainColor, isDark)),
+                      GestureDetector(
+                        onTap: _randomizeMessage,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Text(
+                            _currentMessage,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: mainColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Center(
+                        child: CustomPaint(
+                          size: Size(dropletSize, dropletSize * 1.5),
+                          painter: DropletPainter(
+                            fillPercent: percent,
+                            wavePhase: _wavePhase,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Expanded(child: _buildInfoColumn("Today", "$ml ml", mainColor, isDark)),
+                          Expanded(child: _buildInfoColumn("Goal", "${(goal * 1000).toInt()} ml", mainColor, isDark)),
+                          Expanded(child: _buildInfoColumn("Progress", "${(percent * 100).toInt()}%", mainColor, isDark)),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        alignment: WrapAlignment.center,
+                        children: widget.customSizesNotifier.value
+                            .map((ml) => _buildWaterButton(ml / 1000, mainColor, screenSize))
+                            .toList(),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 30),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: widget.customSizesNotifier.value
-                      .map((ml) => _buildWaterButton(ml / 1000, mainColor))
-                      .toList(),
-                ),
-              ],
+                );
+              },
             ),
           ),
         );
@@ -291,9 +284,12 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildInfoColumn(String title, String value, Color mainColor, bool isDark) {
     return Column(
       children: [
-        Text(
-          value,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: mainColor),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: mainColor),
+          ),
         ),
         const SizedBox(height: 4),
         Text(
@@ -304,9 +300,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildWaterButton(double amount, Color color) {
+  Widget _buildWaterButton(double amount, Color color, Size screenSize) {
     final int ml = (amount * 1000).toInt();
-    final double size = MediaQuery.of(context).size.width / 4.5;
+    final double size = screenSize.width / 4.2;
 
     return GestureDetector(
       onTap: () => _addWater(amount),
