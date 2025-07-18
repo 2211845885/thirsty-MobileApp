@@ -35,7 +35,8 @@ class _HydroBuddyAppState extends State<HydroBuddyApp> {
 
     _isDark = prefs.getBool('darkMode') ?? false;
     _goalNotifier.value = (prefs.getInt('dailyGoal') ?? 4000) / 1000;
-    _intakeNotifier.value = prefs.getInt('intake') ?? 0;
+    _intakeNotifier.value = (prefs.getDouble('intake') ?? 0.0).toInt();
+
 
     final sizes = prefs.getStringList('customSizes')?.map(int.parse).toList();
     if (sizes != null) _customSizesNotifier.value = sizes;
@@ -109,6 +110,7 @@ class _HomePageState extends State<HomePage> {
         onToggleTheme: widget.onToggleTheme,
         goalNotifier: widget.goalNotifier,
         customSizesNotifier: widget.customSizesNotifier,
+        intakeNotifier: widget.intakeNotifier,
       ),
     ];
 
