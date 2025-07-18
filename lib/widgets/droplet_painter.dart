@@ -4,8 +4,13 @@ import 'dart:math';
 class DropletPainter extends CustomPainter {
   final double fillPercent;
   final double wavePhase;
+  final double goal;
 
-  DropletPainter({required this.fillPercent, required this.wavePhase});
+  DropletPainter({
+    required this.fillPercent,
+    required this.wavePhase,
+    required this.goal,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -64,7 +69,7 @@ class DropletPainter extends CustomPainter {
 
     // Text inside droplet
     final percent = (fillPercent * 100).clamp(0, 100).toInt();
-    final ml = (fillPercent * 4000).toInt();
+    final ml = (fillPercent * goal).toInt();
 
     final TextSpan span = TextSpan(
       text: "$ml ML\n$percent%",
@@ -87,7 +92,6 @@ class DropletPainter extends CustomPainter {
     final iconOffset = Offset(width * 0.78, height * 0.22);
     final iconCircleSize = 30.0;
 
-    // Glow background
     canvas.drawCircle(
       iconOffset,
       iconCircleSize / 2,
@@ -96,14 +100,12 @@ class DropletPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
     );
 
-    // Inner circle
     canvas.drawCircle(
       iconOffset,
       iconCircleSize / 2.5,
       Paint()..color = Colors.white.withOpacity(0.4),
     );
 
-    // Icon
     final icon = Icons.local_drink;
     final iconPainter = TextPainter(
       text: TextSpan(

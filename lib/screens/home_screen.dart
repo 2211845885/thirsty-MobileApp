@@ -247,9 +247,10 @@ class _HomeScreenState extends State<HomeScreen>
                         child: CustomPaint(
                           size: Size(dropletSize, dropletSize * 1.5),
                           painter: DropletPainter(
-                            fillPercent: percent,
-                            wavePhase: _wavePhase,
-                          ),
+                          fillPercent: percent,
+                          wavePhase: _wavePhase,
+                          goal: goal * 1000, // Pass the goal in ML
+                        ),
                         ),
                       ),
                       const SizedBox(height: 20),
