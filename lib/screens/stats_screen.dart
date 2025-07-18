@@ -29,15 +29,24 @@ class _StatsScreenState extends State<StatsScreen> {
   void initState() {
     super.initState();
     _loadData();
+
     widget.intakeNotifier.addListener(() {
       _checkGoalAndUpdateStreak();
+    });
+
+    widget.goalNotifier.addListener(() {
+      _resetStreak(); // Reset streak on goal change
     });
   }
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    _weeklyIntake = prefs.getStringList('week')?.map(int.parse).toList() ?? List.filled(7, 0);
-    _streakHistory = prefs.getStringList('streak')?.map(int.parse).toList() ?? List.filled(7, 0);
+    _weeklyIntake =
+        prefs.getStringList('week')?.map(int.parse).toList() ??
+        List.filled(7, 0);
+    _streakHistory =
+        prefs.getStringList('streak')?.map(int.parse).toList() ??
+        List.filled(7, 0);
     _calculateStreak();
     setState(() {});
   }
@@ -63,13 +72,35 @@ class _StatsScreenState extends State<StatsScreen> {
     if (intake >= goal) {
       final prefs = await SharedPreferences.getInstance();
       _streakHistory[index] = 1;
-      await prefs.setStringList('streak', _streakHistory.map((e) => e.toString()).toList());
+      await prefs.setStringList(
+        'streak',
+        _streakHistory.map((e) => e.toString()).toList(),
+      );
       _calculateStreak();
-      setState(() {});
+      if (mounted) setState(() {});
     }
   }
 
-  List<String> get _weekLabels => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  Future<void> _resetStreak() async {
+    final prefs = await SharedPreferences.getInstance();
+    _streakHistory = List.filled(7, 0);
+    await prefs.setStringList(
+      'streak',
+      _streakHistory.map((e) => e.toString()).toList(),
+    );
+    _calculateStreak();
+    if (mounted) setState(() {});
+  }
+
+  List<String> get _weekLabels => [
+        'Sun',
+        'Mon',
+        'Tue',
+        'Wed',
+        'Thu',
+        'Fri',
+        'Sat',
+      ];
 
   BarChartGroupData _barData(int index, int value, Color barColor) {
     return BarChartGroupData(
@@ -80,7 +111,7 @@ class _StatsScreenState extends State<StatsScreen> {
           width: 18,
           borderRadius: BorderRadius.circular(6),
           color: barColor,
-        )
+        ),
       ],
     );
   }
@@ -93,8 +124,13 @@ class _StatsScreenState extends State<StatsScreen> {
     final greyColor = Colors.grey;
     final bgColor = isDark ? const Color(0xFF0A192F) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
-    final cardColor = isDark ? const Color(0xFF1E2A47) : const Color(0xFFF2F9FF);
+    final cardColor = isDark
+        ? const Color(0xFF1E2A47)
+        : const Color(0xFFF2F9FF);
     final size = MediaQuery.of(context).size;
+
+    int bestIndex = _weeklyIntake.indexOf(_weeklyIntake.reduce((a, b) => a > b ? a : b));
+    double avg = _weeklyIntake.reduce((a, b) => a + b) / _weeklyIntake.length;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -103,10 +139,7 @@ class _StatsScreenState extends State<StatsScreen> {
         backgroundColor: bgColor,
         title: Text(
           'Stats',
-          style: TextStyle(
-            color: textColor,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         ),
         iconTheme: IconThemeData(color: textColor),
         actions: [
@@ -139,7 +172,8 @@ class _StatsScreenState extends State<StatsScreen> {
                     const SizedBox(height: 16),
                     _buildCard(
                       title: "Today's Intake",
-                      value: "${widget.intakeNotifier.value} ml / ${(widget.goalNotifier.value * 1000).toInt()} ml",
+                      value:
+                          "${widget.intakeNotifier.value} ml / ${(widget.goalNotifier.value * 1000).toInt()} ml",
                       valueColor: mainColor,
                       textColor: textColor,
                       cardColor: cardColor,
@@ -156,7 +190,7 @@ class _StatsScreenState extends State<StatsScreen> {
                             color: mainColor.withOpacity(0.2),
                             blurRadius: 6,
                             offset: const Offset(0, 4),
-                          )
+                          ),
                         ],
                       ),
                       child: BarChart(
@@ -170,7 +204,10 @@ class _StatsScreenState extends State<StatsScreen> {
                                 reservedSize: 40,
                                 getTitlesWidget: (value, _) => Text(
                                   value.toInt().toString(),
-                                  style: TextStyle(color: textColor, fontSize: 12),
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ),
@@ -179,7 +216,8 @@ class _StatsScreenState extends State<StatsScreen> {
                                 showTitles: true,
                                 getTitlesWidget: (value, _) {
                                   int index = value.toInt();
-                                  if (index >= 0 && index < _weekLabels.length) {
+                                  if (index >= 0 &&
+                                      index < _weekLabels.length) {
                                     return Text(
                                       _weekLabels[index],
                                       style: TextStyle(
@@ -193,17 +231,38 @@ class _StatsScreenState extends State<StatsScreen> {
                                 },
                               ),
                             ),
-                            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            topTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
                           ),
                           borderData: FlBorderData(show: false),
                           gridData: FlGridData(show: false),
                           barGroups: List.generate(
                             7,
-                                (i) => _barData(i, _weeklyIntake[i], mainColor),
+                            (i) => _barData(i, _weeklyIntake[i], mainColor),
                           ),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildCard(
+                      title: "Best Day 💧",
+                      value:
+                          "${_weekLabels[bestIndex]}: ${_weeklyIntake[bestIndex]} ml",
+                      valueColor: Colors.green,
+                      textColor: textColor,
+                      cardColor: cardColor,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildCard(
+                      title: "Weekly Average 📊",
+                      value: "${avg.toStringAsFixed(0)} ml/day",
+                      valueColor: Colors.amber,
+                      textColor: textColor,
+                      cardColor: cardColor,
                     ),
                   ],
                 ),
@@ -232,7 +291,7 @@ class _StatsScreenState extends State<StatsScreen> {
             color: valueColor.withOpacity(0.2),
             blurRadius: 6,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       width: double.infinity,
