@@ -6,7 +6,7 @@ class SettingsScreen extends StatefulWidget {
   final Function(bool) onToggleTheme;
   final ValueNotifier<double> goalNotifier;
   final ValueNotifier<List<int>> customSizesNotifier;
-  final ValueNotifier<int> intakeNotifier; // ✅ Add this
+  final ValueNotifier<int> intakeNotifier;
 
   const SettingsScreen({
     Key? key,
@@ -14,7 +14,7 @@ class SettingsScreen extends StatefulWidget {
     required this.onToggleTheme,
     required this.goalNotifier,
     required this.customSizesNotifier,
-    required this.intakeNotifier, // ✅ Pass it here
+    required this.intakeNotifier,
   }) : super(key: key);
 
   @override
@@ -37,23 +37,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _saveGoal() async {
-    final prefs = await SharedPreferences.getInstance();
-    double goal = double.tryParse(_goalController.text) ?? widget.goalNotifier.value;
-    widget.goalNotifier.value = goal;
-    await prefs.setDouble('goal', goal);
+  final prefs = await SharedPreferences.getInstance();
+  
+  double goal = double.tryParse(_goalController.text) ?? widget.goalNotifier.value;
+  goal = goal.clamp(0.5, 10.0); // safety range
+  widget.goalNotifier.value = goal;
+
+  await prefs.setDouble('goal', goal);
+
+  final intake = widget.intakeNotifier.value.toDouble();
+  final today = DateTime.now().toIso8601String().split('T').first;
+  final lastStreakDate = prefs.getString('lastStreakDate');
+
+  dynamic storedStreak = prefs.get('streak');
+  int streak;
+  if (storedStreak is int) {
+    streak = storedStreak;
+  } else {
+    // Clear bad data and start fresh
+    await prefs.remove('streak');
+    streak = 0;
   }
+
+  if (intake >= goal && lastStreakDate != today) {
+    streak++;
+    await prefs.setInt('streak', streak);
+    await prefs.setString('lastStreakDate', today);
+  }
+}
 
   Future<void> _addCustomSize() async {
     final prefs = await SharedPreferences.getInstance();
-    int? size = int.tryParse(_customSizeController.text);
-    if (size != null && size > 0) {
-      final sizes = [...widget.customSizesNotifier.value, size];
-      setState(() {
-        widget.customSizesNotifier.value = sizes;
-        _customSizeController.clear();
-      });
-      await prefs.setStringList('customSizes', sizes.map((e) => e.toString()).toList());
-    }
+    int? newSize = int.tryParse(_customSizeController.text);
+    if (newSize == null || newSize <= 0) return;
+
+    final sizes = [...widget.customSizesNotifier.value, newSize];
+    setState(() {
+      widget.customSizesNotifier.value = sizes;
+      _customSizeController.clear();
+    });
+    await prefs.setStringList('customSizes', sizes.map((e) => e.toString()).toList());
   }
 
   Future<void> _removeCustomSize(int size) async {
@@ -69,15 +92,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
-    // Reset notifiers
-    widget.goalNotifier.value = 2.0;
+    widget.goalNotifier.value = 2;
     widget.customSizesNotifier.value = [150, 250, 350];
-    widget.intakeNotifier.value = 0; // ✅ Make sure it updates immediately
+    widget.intakeNotifier.value = 0;
 
-    _goalController.text = "2.0";
+    _goalController.text = "2000";
 
     setState(() {});
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("All data has been reset.")),
     );
@@ -140,9 +161,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           IconButton(
             icon: Icon(_isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () {
+            onPressed: () async {
               setState(() => _isDarkMode = !_isDarkMode);
               widget.onToggleTheme(_isDarkMode);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('isDarkMode', _isDarkMode);
             },
           ),
         ],
@@ -151,7 +174,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildCard(
-            title: 'Daily Goal (Liters)',
+            title: 'Daily Goal (ml)',
             cardColor: cardColor,
             textColor: textColor,
             valueColor: valueColor,
@@ -161,7 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   controller: _goalController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    hintText: "e.g. 2.5",
+                    hintText: "e.g. 2500",
                     filled: true,
                     fillColor: _isDarkMode ? cardColor : Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

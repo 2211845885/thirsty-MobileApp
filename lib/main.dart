@@ -7,47 +7,66 @@ import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const HydroBuddyApp());
+  final app = await HydroBuddyApp.create();
+  runApp(app);
 }
 
 class HydroBuddyApp extends StatefulWidget {
-  const HydroBuddyApp({super.key});
+  final bool isDark;
+  final double goal;
+  final int todayIntake;
+  final List<int> customSizes;
+
+  const HydroBuddyApp._({
+    Key? key,
+    required this.isDark,
+    required this.goal,
+    required this.todayIntake,
+    required this.customSizes,
+  }) : super(key: key);
+
+  static Future<Widget> create() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final isDark = prefs.getBool('darkMode') ?? false;
+    final goal = prefs.getDouble('goal') ?? 2.0;
+
+    final todayKey = DateTime.now().toIso8601String().substring(0, 10);
+    final todayIntake = prefs.getInt('intake_$todayKey') ?? 0;
+
+    final sizes = prefs.getStringList('customSizes')?.map(int.parse).toList() ?? [200, 300, 500];
+
+    return HydroBuddyApp._(
+      isDark: isDark,
+      goal: goal,
+      todayIntake: todayIntake,
+      customSizes: sizes,
+    );
+  }
 
   @override
   State<HydroBuddyApp> createState() => _HydroBuddyAppState();
 }
 
 class _HydroBuddyAppState extends State<HydroBuddyApp> {
-  bool _isDark = false;
-
-  final ValueNotifier<double> _goalNotifier = ValueNotifier(4.0);
-  final ValueNotifier<int> _intakeNotifier = ValueNotifier(0);
-  final ValueNotifier<List<int>> _customSizesNotifier = ValueNotifier([200, 300, 500]);
+  late bool _isDark;
+  late final ValueNotifier<double> _goalNotifier;
+  late final ValueNotifier<int> _intakeNotifier;
+  late final ValueNotifier<List<int>> _customSizesNotifier;
 
   @override
   void initState() {
     super.initState();
-    _loadAll();
-  }
-
-  Future<void> _loadAll() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    _isDark = prefs.getBool('darkMode') ?? false;
-    _goalNotifier.value = (prefs.getInt('dailyGoal') ?? 4000) / 1000;
-    _intakeNotifier.value = (prefs.getDouble('intake') ?? 0.0).toInt();
-
-
-    final sizes = prefs.getStringList('customSizes')?.map(int.parse).toList();
-    if (sizes != null) _customSizesNotifier.value = sizes;
-
-    setState(() {});
+    _isDark = widget.isDark;
+    _goalNotifier = ValueNotifier(widget.goal);
+    _intakeNotifier = ValueNotifier(widget.todayIntake);
+    _customSizesNotifier = ValueNotifier(widget.customSizes);
   }
 
   void _toggleTheme(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _isDark = value);
     await prefs.setBool('darkMode', value);
+    setState(() => _isDark = value);
   }
 
   @override
@@ -89,12 +108,17 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _index = 0;
 
+  void _handleThemeToggle() {
+    final newValue = !widget.isDark;
+    widget.onToggleTheme(newValue);
+  }
+
   @override
   Widget build(BuildContext context) {
     final screens = [
       HomeScreen(
         isDarkTheme: widget.isDark,
-        onToggleTheme: () => widget.onToggleTheme(!widget.isDark),
+        onToggleTheme: _handleThemeToggle,
         goalNotifier: widget.goalNotifier,
         intakeNotifier: widget.intakeNotifier,
         customSizesNotifier: widget.customSizesNotifier,

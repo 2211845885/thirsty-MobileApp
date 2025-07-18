@@ -33,35 +33,40 @@ class _StatsScreenState extends State<StatsScreen> {
     widget.intakeNotifier.addListener(() {
       _checkGoalAndUpdateStreak();
     });
-
-    widget.goalNotifier.addListener(() {
-      _resetStreak(); // Reset streak on goal change
-    });
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    _weeklyIntake =
-        prefs.getStringList('week')?.map(int.parse).toList() ??
-        List.filled(7, 0);
-    _streakHistory =
-        prefs.getStringList('streak')?.map(int.parse).toList() ??
-        List.filled(7, 0);
-    _calculateStreak();
-    setState(() {});
+  final prefs = await SharedPreferences.getInstance();
+
+  // Load and parse weekly intake
+  final weekListRaw = prefs.getStringList('week');
+  if (weekListRaw != null && weekListRaw.length == 7) {
+    _weeklyIntake = weekListRaw.map((e) => int.tryParse(e) ?? 0).toList();
+  } else {
+    _weeklyIntake = List.filled(7, 0);
   }
 
-  void _calculateStreak() {
-    int count = 0;
-    for (var day in _streakHistory.reversed) {
-      if (day == 1) {
-        count++;
-      } else {
-        break;
-      }
+  // Load and parse streak history safely
+  final streakRaw = prefs.get('streak');
+  if (streakRaw is List<String> && streakRaw.length == 7) {
+    try {
+      _streakHistory = streakRaw.map((e) => int.tryParse(e) ?? 0).toList();
+    } catch (e) {
+      _streakHistory = List.filled(7, 0); // fallback
     }
-    _streak = count;
+  } else {
+    // If streak is corrupted or legacy (e.g., int), reset it
+    _streakHistory = List.filled(7, 0);
+    await prefs.setStringList('streak', _streakHistory.map((e) => e.toString()).toList());
   }
+
+  _calculateStreak();
+  if (mounted) setState(() {});
+}
+
+void _calculateStreak() {
+  _streak = _streakHistory.reversed.takeWhile((day) => day == 1).length;
+}
 
   Future<void> _checkGoalAndUpdateStreak() async {
     final intake = widget.intakeNotifier.value;
@@ -69,7 +74,7 @@ class _StatsScreenState extends State<StatsScreen> {
     final now = DateTime.now();
     final index = now.weekday % 7;
 
-    if (intake >= goal) {
+    if (intake >= goal && _streakHistory[index] != 1) {
       final prefs = await SharedPreferences.getInstance();
       _streakHistory[index] = 1;
       await prefs.setStringList(
@@ -81,25 +86,8 @@ class _StatsScreenState extends State<StatsScreen> {
     }
   }
 
-  Future<void> _resetStreak() async {
-    final prefs = await SharedPreferences.getInstance();
-    _streakHistory = List.filled(7, 0);
-    await prefs.setStringList(
-      'streak',
-      _streakHistory.map((e) => e.toString()).toList(),
-    );
-    _calculateStreak();
-    if (mounted) setState(() {});
-  }
-
   List<String> get _weekLabels => [
-        'Sun',
-        'Mon',
-        'Tue',
-        'Wed',
-        'Thu',
-        'Fri',
-        'Sat',
+        'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat',
       ];
 
   BarChartGroupData _barData(int index, int value, Color barColor) {
@@ -124,9 +112,7 @@ class _StatsScreenState extends State<StatsScreen> {
     final greyColor = Colors.grey;
     final bgColor = isDark ? const Color(0xFF0A192F) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
-    final cardColor = isDark
-        ? const Color(0xFF1E2A47)
-        : const Color(0xFFF2F9FF);
+    final cardColor = isDark ? const Color(0xFF1E2A47) : const Color(0xFFF2F9FF);
     final size = MediaQuery.of(context).size;
 
     int bestIndex = _weeklyIntake.indexOf(_weeklyIntake.reduce((a, b) => a > b ? a : b));
@@ -216,8 +202,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                 showTitles: true,
                                 getTitlesWidget: (value, _) {
                                   int index = value.toInt();
-                                  if (index >= 0 &&
-                                      index < _weekLabels.length) {
+                                  if (index >= 0 && index < _weekLabels.length) {
                                     return Text(
                                       _weekLabels[index],
                                       style: TextStyle(
