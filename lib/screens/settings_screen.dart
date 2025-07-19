@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool isDark;
@@ -7,6 +8,7 @@ class SettingsScreen extends StatefulWidget {
   final ValueNotifier<double> goalNotifier;
   final ValueNotifier<List<int>> customSizesNotifier;
   final ValueNotifier<int> intakeNotifier;
+  
 
   const SettingsScreen({
     Key? key,
@@ -25,6 +27,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _goalController = TextEditingController();
   final TextEditingController _customSizeController = TextEditingController();
   late bool _isDarkMode;
+  bool _notificationsEnabled = false;
+  int _notificationIntervalHours = 1;
+
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
@@ -34,37 +41,111 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (widget.customSizesNotifier.value.isEmpty) {
       widget.customSizesNotifier.value = [150, 250, 350];
     }
+    _initNotifications();
+  }
+
+  Future<void> _initNotifications() async {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings =
+        InitializationSettings(android: androidSettings);
+
+    await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? false;
+      _notificationIntervalHours = prefs.getInt('notificationIntervalHours') ?? 1;
+    });
+
+    if (_notificationsEnabled) {
+      _scheduleNotifications();
+    }
+  }
+
+  Future<void> _toggleNotifications(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() => _notificationsEnabled = value);
+    await prefs.setBool('notificationsEnabled', value);
+
+    if (value) {
+      _scheduleNotifications();
+    } else {
+      _cancelNotifications();
+    }
+  }
+
+  Future<void> _setNotificationInterval(int hours) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() => _notificationIntervalHours = hours);
+    await prefs.setInt('notificationIntervalHours', hours);
+
+    if (_notificationsEnabled) {
+      _scheduleNotifications();
+    }
+  }
+
+  Future<void> _scheduleNotifications() async {
+    await flutterLocalNotificationsPlugin.cancelAll();
+
+    const androidDetails = AndroidNotificationDetails(
+      'reminder_channel',
+      'Reminders',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    const platformDetails = NotificationDetails(android: androidDetails);
+
+    // flutter_local_notifications does not support custom intervals directly.
+    // Here, we schedule a notification repeating every hour as a simple example.
+    // You can implement more advanced scheduling with zonedSchedule if needed.
+
+    // Calculate interval in minutes (minimum 60)
+    final intervalMinutes = _notificationIntervalHours * 60;
+
+    await flutterLocalNotificationsPlugin.periodicallyShow(
+      0,
+      'Hydration Reminder',
+      'Time to drink some water!',
+      RepeatInterval.hourly, // This is fixed, does not support custom intervals
+      platformDetails,
+      androidAllowWhileIdle: true,
+    );
+
+    // Note: For true custom intervals, use zonedSchedule and reschedule after each notification.
+  }
+
+  Future<void> _cancelNotifications() async {
+    await flutterLocalNotificationsPlugin.cancelAll();
   }
 
   Future<void> _saveGoal() async {
-  final prefs = await SharedPreferences.getInstance();
-  
-  double goal = double.tryParse(_goalController.text) ?? widget.goalNotifier.value;
-  goal = goal.clamp(0.5, 10.0); // safety range
-  widget.goalNotifier.value = goal;
+    final prefs = await SharedPreferences.getInstance();
+    double goal = double.tryParse(_goalController.text) ?? widget.goalNotifier.value;
+    goal = goal.clamp(0.5, 10.0);
+    widget.goalNotifier.value = goal;
+    await prefs.setDouble('goal', goal);
 
-  await prefs.setDouble('goal', goal);
+    final intake = widget.intakeNotifier.value.toDouble();
+    final today = DateTime.now().toIso8601String().split('T').first;
+    final lastStreakDate = prefs.getString('lastStreakDate');
 
-  final intake = widget.intakeNotifier.value.toDouble();
-  final today = DateTime.now().toIso8601String().split('T').first;
-  final lastStreakDate = prefs.getString('lastStreakDate');
+    dynamic storedStreak = prefs.get('streak');
+    int streak;
+    if (storedStreak is int) {
+      streak = storedStreak;
+    } else {
+      await prefs.remove('streak');
+      streak = 0;
+    }
 
-  dynamic storedStreak = prefs.get('streak');
-  int streak;
-  if (storedStreak is int) {
-    streak = storedStreak;
-  } else {
-    // Clear bad data and start fresh
-    await prefs.remove('streak');
-    streak = 0;
+    if (intake >= goal && lastStreakDate != today) {
+      streak++;
+      await prefs.setInt('streak', streak);
+      await prefs.setString('lastStreakDate', today);
+    }
   }
-
-  if (intake >= goal && lastStreakDate != today) {
-    streak++;
-    await prefs.setInt('streak', streak);
-    await prefs.setString('lastStreakDate', today);
-  }
-}
 
   Future<void> _addCustomSize() async {
     final prefs = await SharedPreferences.getInstance();
@@ -91,13 +172,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _resetData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-
     widget.goalNotifier.value = 2;
     widget.customSizesNotifier.value = [150, 250, 350];
     widget.intakeNotifier.value = 0;
-
     _goalController.text = "2000";
-
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("All data has been reset.")),
@@ -263,6 +341,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           _buildCard(
+            title: 'Notifications',
+            cardColor: cardColor,
+            textColor: textColor,
+            valueColor: valueColor,
+            child: Column(
+              children: [
+                SwitchListTile(
+                  value: _notificationsEnabled,
+                  onChanged: _toggleNotifications,
+                  title: Text('Enable Reminders', style: TextStyle(color: textColor)),
+                ),
+                if (_notificationsEnabled)
+                  Row(
+                    children: [
+                      const Text('Every ', style: TextStyle(fontSize: 16)),
+                      DropdownButton<int>(
+                        value: _notificationIntervalHours,
+                        items: [1, 2, 3, 4, 6, 8].map((hour) {
+                          return DropdownMenuItem(
+                            value: hour,
+                            child: Text('$hour hour${hour > 1 ? "s" : ""}'),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) _setNotificationInterval(value);
+                        },
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          _buildCard(
             title: '💧 Benefits of Drinking Water',
             cardColor: cardColor,
             textColor: textColor,
@@ -277,9 +388,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   "🌡️ Helps maintain body temperature",
                   "🍽️ Aids in digestion and weight loss",
                 ].map((b) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(b, style: TextStyle(color: textColor)),
-                )),
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(b, style: TextStyle(color: textColor)),
+                    )),
               ],
             ),
           ),

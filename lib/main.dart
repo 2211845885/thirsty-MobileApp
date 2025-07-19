@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/settings_screen.dart';
+
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +57,8 @@ class _HydroBuddyAppState extends State<HydroBuddyApp> {
   late final ValueNotifier<int> _intakeNotifier;
   late final ValueNotifier<List<int>> _customSizesNotifier;
 
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +66,8 @@ class _HydroBuddyAppState extends State<HydroBuddyApp> {
     _goalNotifier = ValueNotifier(widget.goal);
     _intakeNotifier = ValueNotifier(widget.todayIntake);
     _customSizesNotifier = ValueNotifier(widget.customSizes);
+
+    _initLocalNotifications();
   }
 
   void _toggleTheme(bool value) async {
@@ -69,17 +76,66 @@ class _HydroBuddyAppState extends State<HydroBuddyApp> {
     setState(() => _isDark = value);
   }
 
+  Future<void> _updateIntake(int newIntake) async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayKey = DateTime.now().toIso8601String().substring(0, 10);
+    await prefs.setInt('intake_$todayKey', newIntake);
+    _intakeNotifier.value = newIntake;
+  }
+
+  Future<void> _updateGoal(double newGoal) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('goal', newGoal);
+    _goalNotifier.value = newGoal;
+  }
+
+  void _initLocalNotifications() async {
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const ios = DarwinInitializationSettings();
+    const initSettings = InitializationSettings(android: android, iOS: ios);
+
+    await _localNotifications.initialize(initSettings);
+
+    _showTestNotification();
+  }
+
+  void _showTestNotification() async {
+    const androidDetails = AndroidNotificationDetails(
+      'water_reminder_channel',
+      'Water Reminder',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const iosDetails = DarwinNotificationDetails();
+
+    const generalNotificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _localNotifications.show(
+      0,
+      'HydroBuddy Reminder',
+      'Time to drink some water!',
+      generalNotificationDetails,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: _isDark ? ThemeData.dark() : ThemeData.light(),
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [routeObserver],
       home: HomePage(
         isDark: _isDark,
         onToggleTheme: _toggleTheme,
         goalNotifier: _goalNotifier,
         intakeNotifier: _intakeNotifier,
         customSizesNotifier: _customSizesNotifier,
+        updateIntake: _updateIntake,
+        updateGoal: _updateGoal,
       ),
     );
   }
@@ -92,6 +148,9 @@ class HomePage extends StatefulWidget {
   final ValueNotifier<int> intakeNotifier;
   final ValueNotifier<List<int>> customSizesNotifier;
 
+  final Future<void> Function(int) updateIntake;
+  final Future<void> Function(double) updateGoal;
+
   const HomePage({
     super.key,
     required this.isDark,
@@ -99,6 +158,8 @@ class HomePage extends StatefulWidget {
     required this.goalNotifier,
     required this.intakeNotifier,
     required this.customSizesNotifier,
+    required this.updateIntake,
+    required this.updateGoal,
   });
 
   @override
@@ -109,8 +170,16 @@ class _HomePageState extends State<HomePage> {
   int _index = 0;
 
   void _handleThemeToggle() {
-    final newValue = !widget.isDark;
-    widget.onToggleTheme(newValue);
+    widget.onToggleTheme(!widget.isDark);
+  }
+
+  void _addWater(int amount) {
+    final newIntake = widget.intakeNotifier.value + amount;
+    widget.updateIntake(newIntake);
+  }
+
+  void _updateGoal(double newGoal) {
+    widget.updateGoal(newGoal);
   }
 
   @override
@@ -122,6 +191,7 @@ class _HomePageState extends State<HomePage> {
         goalNotifier: widget.goalNotifier,
         intakeNotifier: widget.intakeNotifier,
         customSizesNotifier: widget.customSizesNotifier,
+        addWater: _addWater,
       ),
       StatsScreen(
         isDark: widget.isDark,

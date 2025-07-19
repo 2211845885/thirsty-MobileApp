@@ -1,4 +1,5 @@
-// Keep all imports the same
+import 'package:flutter/widgets.dart';
+import '../main.dart'; // For routeObserver
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +11,7 @@ class HomeScreen extends StatefulWidget {
   final ValueNotifier<double> goalNotifier;
   final ValueNotifier<int> intakeNotifier;
   final ValueNotifier<List<int>> customSizesNotifier;
+  final void Function(int amount) addWater;
 
   const HomeScreen({
     Key? key,
@@ -18,6 +20,7 @@ class HomeScreen extends StatefulWidget {
     required this.goalNotifier,
     required this.intakeNotifier,
     required this.customSizesNotifier,
+    required this.addWater,
   }) : super(key: key);
 
   @override
@@ -25,7 +28,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver, RouteAware {
   double _liters = 0.0;
   String _lastDate = "";
   late AnimationController _controller;
@@ -63,14 +66,22 @@ class _HomeScreenState extends State<HomeScreen>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
-    )..addListener(() => setState(() => _wavePhase += 0.03))
+    )
+      ..addListener(() => setState(() => _wavePhase += 0.03))
       ..repeat();
 
     _customSizeListener = () => setState(() {});
     widget.customSizesNotifier.addListener(_customSizeListener);
 
     _randomizeMessage();
+    _checkNewDay(); // Check/reset on startup
     _loadData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
   }
 
   void _randomizeMessage() {
@@ -84,7 +95,14 @@ class _HomeScreenState extends State<HomeScreen>
     _controller.dispose();
     widget.customSizesNotifier.removeListener(_customSizeListener);
     WidgetsBinding.instance.removeObserver(this);
+    routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    print("Returned to HomeScreen");
+    _checkNewDay(); // Refresh intake and UI when coming back
   }
 
   @override
@@ -92,12 +110,6 @@ class _HomeScreenState extends State<HomeScreen>
     if (state == AppLifecycleState.resumed) {
       _checkNewDay();
     }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _checkNewDay();
   }
 
   Future<void> _loadData() async {
@@ -121,10 +133,15 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _checkNewDay() async {
     final prefs = await SharedPreferences.getInstance();
     String currentDate = _formattedDate();
+    String storedLastDate = prefs.getString('lastDate') ?? "";
 
-    if (_lastDate != currentDate) {
+    if (storedLastDate != currentDate) {
       await _resetForNewDay(prefs);
       _lastDate = currentDate;
+      await prefs.setString('lastDate', _lastDate);
+      if (mounted) setState(() {});
+    } else {
+      _lastDate = storedLastDate; // sync local copy
     }
   }
 
@@ -134,11 +151,10 @@ class _HomeScreenState extends State<HomeScreen>
     week[today] = '0';
     await prefs.setStringList('week', week);
 
-    prefs.setDouble('intake', 0.0);
-    prefs.setString('lastDate', _formattedDate());
+    await prefs.setDouble('intake', 0.0);
+    await prefs.setString('lastDate', _formattedDate());
 
     _liters = 0.0;
-    widget.intakeNotifier.value = -1;
     widget.intakeNotifier.value = 0;
   }
 
@@ -181,6 +197,13 @@ class _HomeScreenState extends State<HomeScreen>
   String _formattedDate() {
     final now = DateTime.now();
     return "${now.year}-${now.month}-${now.day}";
+  }
+
+  // Add this method to refresh data externally
+  Future<void> refreshData() async {
+    await _checkNewDay();
+    await _loadData();
+    if (mounted) setState(() {});
   }
 
   @override
@@ -247,10 +270,10 @@ class _HomeScreenState extends State<HomeScreen>
                         child: CustomPaint(
                           size: Size(dropletSize, dropletSize * 1.5),
                           painter: DropletPainter(
-                          fillPercent: percent,
-                          wavePhase: _wavePhase,
-                          goal: goal * 1000, // Pass the goal in ML
-                        ),
+                            fillPercent: percent,
+                            wavePhase: _wavePhase,
+                            goal: goal * 1000, // Pass the goal in ML
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),

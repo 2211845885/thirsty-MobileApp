@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -20,53 +21,89 @@ class StatsScreen extends StatefulWidget {
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
-class _StatsScreenState extends State<StatsScreen> {
+class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
   List<int> _weeklyIntake = List.filled(7, 0);
   List<int> _streakHistory = List.filled(7, 0);
   int _streak = 0;
 
+  late VoidCallback _intakeListener;
+  late VoidCallback _goalListener;
+
   @override
   void initState() {
     super.initState();
-    _loadData();
+    WidgetsBinding.instance.addObserver(this);
 
-    widget.intakeNotifier.addListener(() {
-      _checkGoalAndUpdateStreak();
-    });
+    _checkForReset().then((_) => _loadData());
+
+    _intakeListener = () async {
+      await _checkGoalAndUpdateStreak();
+      await _loadData();
+    };
+    widget.intakeNotifier.addListener(_intakeListener);
+
+    _goalListener = () async {
+      await _loadData();
+    };
+    widget.goalNotifier.addListener(_goalListener);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.intakeNotifier.removeListener(_intakeListener);
+    widget.goalNotifier.removeListener(_goalListener);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkForReset().then((_) => _loadData());
+    }
+  }
+
+  Future<void> _checkForReset() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final lastResetDate = prefs.getString('lastResetDate') ?? '';
+
+    final now = DateTime.now();
+    final currentDateStr = "${now.year}-${now.month}-${now.day}";
+
+    // Reset today's intake if day changed
+    if (lastResetDate != currentDateStr) {
+      await prefs.setString('lastResetDate', currentDateStr);
+      await prefs.setInt('intake', 0);
+      widget.intakeNotifier.value = 0;
+    }
   }
 
   Future<void> _loadData() async {
-  final prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
 
-  // Load and parse weekly intake
-  final weekListRaw = prefs.getStringList('week');
-  if (weekListRaw != null && weekListRaw.length == 7) {
-    _weeklyIntake = weekListRaw.map((e) => int.tryParse(e) ?? 0).toList();
-  } else {
-    _weeklyIntake = List.filled(7, 0);
-  }
-
-  // Load and parse streak history safely
-  final streakRaw = prefs.get('streak');
-  if (streakRaw is List<String> && streakRaw.length == 7) {
-    try {
-      _streakHistory = streakRaw.map((e) => int.tryParse(e) ?? 0).toList();
-    } catch (e) {
-      _streakHistory = List.filled(7, 0); // fallback
+    final weekListRaw = prefs.getStringList('week');
+    if (weekListRaw != null && weekListRaw.length == 7) {
+      _weeklyIntake = weekListRaw.map((e) => int.tryParse(e) ?? 0).toList();
+    } else {
+      _weeklyIntake = List.filled(7, 0);
     }
-  } else {
-    // If streak is corrupted or legacy (e.g., int), reset it
-    _streakHistory = List.filled(7, 0);
-    await prefs.setStringList('streak', _streakHistory.map((e) => e.toString()).toList());
+
+    final streakRaw = prefs.getStringList('streak');
+    if (streakRaw != null && streakRaw.length == 7) {
+      _streakHistory = streakRaw.map((e) => int.tryParse(e) ?? 0).toList();
+    } else {
+      _streakHistory = List.filled(7, 0);
+      await prefs.setStringList('streak', _streakHistory.map((e) => e.toString()).toList());
+    }
+
+    _calculateStreak();
+    if (mounted) setState(() {});
   }
 
-  _calculateStreak();
-  if (mounted) setState(() {});
-}
-
-void _calculateStreak() {
-  _streak = _streakHistory.reversed.takeWhile((day) => day == 1).length;
-}
+  void _calculateStreak() {
+    _streak = _streakHistory.reversed.takeWhile((day) => day == 1).length;
+  }
 
   Future<void> _checkGoalAndUpdateStreak() async {
     final intake = widget.intakeNotifier.value;
@@ -86,9 +123,7 @@ void _calculateStreak() {
     }
   }
 
-  List<String> get _weekLabels => [
-        'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat',
-      ];
+  List<String> get _weekLabels => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   BarChartGroupData _barData(int index, int value, Color barColor) {
     return BarChartGroupData(
@@ -136,6 +171,13 @@ void _calculateStreak() {
             ),
             onPressed: () => widget.onToggleTheme(!widget.isDark),
             tooltip: "Toggle Theme",
+          ),
+          IconButton(
+            icon: Icon(Icons.refresh, color: textColor),
+            tooltip: 'Refresh Stats',
+            onPressed: () async {
+              await _loadData();
+            },
           ),
         ],
       ),
