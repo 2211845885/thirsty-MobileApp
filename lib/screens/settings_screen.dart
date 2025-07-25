@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../services/notification_service.dart'; // Adjust import if needed
 
 class SettingsScreen extends StatefulWidget {
   final bool isDark;
@@ -8,7 +8,6 @@ class SettingsScreen extends StatefulWidget {
   final ValueNotifier<double> goalNotifier;
   final ValueNotifier<List<int>> customSizesNotifier;
   final ValueNotifier<int> intakeNotifier;
-  
 
   const SettingsScreen({
     Key? key,
@@ -26,12 +25,9 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _goalController = TextEditingController();
   final TextEditingController _customSizeController = TextEditingController();
+  final TextEditingController _intervalController = TextEditingController();
   late bool _isDarkMode;
-  bool _notificationsEnabled = false;
-  int _notificationIntervalHours = 1;
-
-  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  bool _notificationsEnabled = true;
 
   @override
   void initState() {
@@ -41,83 +37,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (widget.customSizesNotifier.value.isEmpty) {
       widget.customSizesNotifier.value = [150, 250, 350];
     }
-    _initNotifications();
+    _loadNotificationPrefs();
   }
 
-  Future<void> _initNotifications() async {
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const InitializationSettings initSettings =
-        InitializationSettings(android: androidSettings);
-
-    await flutterLocalNotificationsPlugin.initialize(initSettings);
-
+  Future<void> _loadNotificationPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('notificationsEnabled') ?? true;
+    final interval = prefs.getInt('notificationInterval') ?? 120;
     setState(() {
-      _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? false;
-      _notificationIntervalHours = prefs.getInt('notificationIntervalHours') ?? 1;
+      _notificationsEnabled = enabled;
+      _intervalController.text = interval.toString();
     });
-
-    if (_notificationsEnabled) {
-      _scheduleNotifications();
-    }
   }
 
-  Future<void> _toggleNotifications(bool value) async {
+  Future<void> _saveNotifications() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _notificationsEnabled = value);
-    await prefs.setBool('notificationsEnabled', value);
-
-    if (value) {
-      _scheduleNotifications();
-    } else {
-      _cancelNotifications();
-    }
-  }
-
-  Future<void> _setNotificationInterval(int hours) async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() => _notificationIntervalHours = hours);
-    await prefs.setInt('notificationIntervalHours', hours);
-
+    final interval = int.tryParse(_intervalController.text) ?? 120;
+    await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+    await prefs.setInt('notificationInterval', interval);
+    await NotificationService.cancelAll();
     if (_notificationsEnabled) {
-      _scheduleNotifications();
+      await NotificationService.scheduleRepeating(
+        id: 0,
+        title: 'Hydration Reminder',
+        body: 'Time to drink water!',
+        interval: Duration(minutes: interval),
+      );
     }
-  }
-
-  Future<void> _scheduleNotifications() async {
-    await flutterLocalNotificationsPlugin.cancelAll();
-
-    const androidDetails = AndroidNotificationDetails(
-      'reminder_channel',
-      'Reminders',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-
-    const platformDetails = NotificationDetails(android: androidDetails);
-
-    // flutter_local_notifications does not support custom intervals directly.
-    // Here, we schedule a notification repeating every hour as a simple example.
-    // You can implement more advanced scheduling with zonedSchedule if needed.
-
-    // Calculate interval in minutes (minimum 60)
-    final intervalMinutes = _notificationIntervalHours * 60;
-
-    await flutterLocalNotificationsPlugin.periodicallyShow(
-      0,
-      'Hydration Reminder',
-      'Time to drink some water!',
-      RepeatInterval.hourly, // This is fixed, does not support custom intervals
-      platformDetails,
-      androidAllowWhileIdle: true,
-    );
-
-    // Note: For true custom intervals, use zonedSchedule and reschedule after each notification.
-  }
-
-  Future<void> _cancelNotifications() async {
-    await flutterLocalNotificationsPlugin.cancelAll();
   }
 
   Future<void> _saveGoal() async {
@@ -126,32 +72,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     goal = goal.clamp(0.5, 10.0);
     widget.goalNotifier.value = goal;
     await prefs.setDouble('goal', goal);
-
-    final intake = widget.intakeNotifier.value.toDouble();
-    final today = DateTime.now().toIso8601String().split('T').first;
-    final lastStreakDate = prefs.getString('lastStreakDate');
-
-    dynamic storedStreak = prefs.get('streak');
-    int streak;
-    if (storedStreak is int) {
-      streak = storedStreak;
-    } else {
-      await prefs.remove('streak');
-      streak = 0;
-    }
-
-    if (intake >= goal && lastStreakDate != today) {
-      streak++;
-      await prefs.setInt('streak', streak);
-      await prefs.setString('lastStreakDate', today);
-    }
   }
 
   Future<void> _addCustomSize() async {
     final prefs = await SharedPreferences.getInstance();
     int? newSize = int.tryParse(_customSizeController.text);
     if (newSize == null || newSize <= 0) return;
-
     final sizes = [...widget.customSizesNotifier.value, newSize];
     setState(() {
       widget.customSizesNotifier.value = sizes;
@@ -163,9 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _removeCustomSize(int size) async {
     final prefs = await SharedPreferences.getInstance();
     final sizes = widget.customSizesNotifier.value.where((e) => e != size).toList();
-    setState(() {
-      widget.customSizesNotifier.value = sizes;
-    });
+    setState(() => widget.customSizesNotifier.value = sizes);
     await prefs.setStringList('customSizes', sizes.map((e) => e.toString()).toList());
   }
 
@@ -200,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: valueColor.withOpacity(0.2),
             blurRadius: 6,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -260,28 +184,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 TextField(
                   controller: _goalController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     hintText: "e.g. 2500",
                     filled: true,
                     fillColor: _isDarkMode ? cardColor : Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   style: TextStyle(color: textColor),
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _saveGoal,
-                    child: const Text('Save Goal', style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: valueColor,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                ElevatedButton(
+                  onPressed: _saveGoal,
+                  child: const Text('Save Goal', style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: valueColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
                     ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ],
@@ -304,7 +229,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           hintText: "e.g. 250",
                           filled: true,
                           fillColor: _isDarkMode ? cardColor : Colors.white,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         style: TextStyle(color: textColor),
                       ),
@@ -316,7 +243,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: valueColor,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       ),
                       child: const Icon(Icons.add),
@@ -330,7 +259,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     return Chip(
                       label: Text("$size ml", style: const TextStyle(color: Colors.white)),
                       backgroundColor: valueColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       deleteIcon: const Icon(Icons.close, color: Colors.white),
                       onDeleted: () => _removeCustomSize(size),
@@ -349,48 +280,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 SwitchListTile(
                   value: _notificationsEnabled,
-                  onChanged: _toggleNotifications,
-                  title: Text('Enable Reminders', style: TextStyle(color: textColor)),
+                  onChanged: (val) => setState(() => _notificationsEnabled = val),
+                  title: Text("Enable Notifications", style: TextStyle(color: textColor)),
+                  activeColor: valueColor,
                 ),
-                if (_notificationsEnabled)
-                  Row(
-                    children: [
-                      const Text('Every ', style: TextStyle(fontSize: 16)),
-                      DropdownButton<int>(
-                        value: _notificationIntervalHours,
-                        items: [1, 2, 3, 4, 6, 8].map((hour) {
-                          return DropdownMenuItem(
-                            value: hour,
-                            child: Text('$hour hour${hour > 1 ? "s" : ""}'),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) _setNotificationInterval(value);
-                        },
-                      ),
-                    ],
+                TextField(
+                  controller: _intervalController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Interval (minutes)',
+                    filled: true,
+                    fillColor: _isDarkMode ? cardColor : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-              ],
-            ),
-          ),
-          _buildCard(
-            title: '💧 Benefits of Drinking Water',
-            cardColor: cardColor,
-            textColor: textColor,
-            valueColor: valueColor,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ...[
-                  "⚡ Boosts energy & relieves fatigue",
-                  "🚰 Flushes out toxins from the body",
-                  "🌟 Improves skin complexion",
-                  "🌡️ Helps maintain body temperature",
-                  "🍽️ Aids in digestion and weight loss",
-                ].map((b) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(b, style: TextStyle(color: textColor)),
-                    )),
+                  style: TextStyle(color: textColor),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: _saveNotifications,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: valueColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text("Save Notification Settings"),
+                ),
               ],
             ),
           ),
@@ -403,17 +320,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               backgroundColor: errorColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
           const SizedBox(height: 24),
           Center(
             child: Text(
               "© 2025 Hydration App by Team2",
-              style: TextStyle(
-                fontSize: 12,
-                color: textColor.withOpacity(0.5),
-              ),
+              style: TextStyle(fontSize: 12, color: textColor.withOpacity(0.5)),
             ),
           ),
           const SizedBox(height: 16),

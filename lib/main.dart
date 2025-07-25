@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/stats_screen.dart';
@@ -33,10 +32,8 @@ class HydroBuddyApp extends StatefulWidget {
 
     final isDark = prefs.getBool('darkMode') ?? false;
     final goal = prefs.getDouble('goal') ?? 2.0;
-
     final todayKey = DateTime.now().toIso8601String().substring(0, 10);
     final todayIntake = prefs.getInt('intake_$todayKey') ?? 0;
-
     final sizes = prefs.getStringList('customSizes')?.map(int.parse).toList() ?? [200, 300, 500];
 
     return HydroBuddyApp._(
@@ -57,8 +54,6 @@ class _HydroBuddyAppState extends State<HydroBuddyApp> {
   late final ValueNotifier<int> _intakeNotifier;
   late final ValueNotifier<List<int>> _customSizesNotifier;
 
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
-
   @override
   void initState() {
     super.initState();
@@ -66,8 +61,6 @@ class _HydroBuddyAppState extends State<HydroBuddyApp> {
     _goalNotifier = ValueNotifier(widget.goal);
     _intakeNotifier = ValueNotifier(widget.todayIntake);
     _customSizesNotifier = ValueNotifier(widget.customSizes);
-
-    _initLocalNotifications();
   }
 
   void _toggleTheme(bool value) async {
@@ -87,39 +80,6 @@ class _HydroBuddyAppState extends State<HydroBuddyApp> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('goal', newGoal);
     _goalNotifier.value = newGoal;
-  }
-
-  void _initLocalNotifications() async {
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const ios = DarwinInitializationSettings();
-    const initSettings = InitializationSettings(android: android, iOS: ios);
-
-    await _localNotifications.initialize(initSettings);
-
-    _showTestNotification();
-  }
-
-  void _showTestNotification() async {
-    const androidDetails = AndroidNotificationDetails(
-      'water_reminder_channel',
-      'Water Reminder',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-
-    const iosDetails = DarwinNotificationDetails();
-
-    const generalNotificationDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _localNotifications.show(
-      0,
-      'HydroBuddy Reminder',
-      'Time to drink some water!',
-      generalNotificationDetails,
-    );
   }
 
   @override
@@ -176,10 +136,6 @@ class _HomePageState extends State<HomePage> {
   void _addWater(int amount) {
     final newIntake = widget.intakeNotifier.value + amount;
     widget.updateIntake(newIntake);
-  }
-
-  void _updateGoal(double newGoal) {
-    widget.updateGoal(newGoal);
   }
 
   @override
