@@ -23,8 +23,6 @@ class StatsScreen extends StatefulWidget {
 
 class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
   List<int> _weeklyIntake = List.filled(7, 0);
-  List<int> _streakHistory = List.filled(7, 0);
-  int _streak = 0;
 
   late VoidCallback _intakeListener;
   late VoidCallback _goalListener;
@@ -37,7 +35,6 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
     _checkForReset().then((_) => _loadData());
 
     _intakeListener = () async {
-      await _checkGoalAndUpdateStreak();
       await _loadData();
     };
     widget.intakeNotifier.addListener(_intakeListener);
@@ -89,38 +86,7 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
       _weeklyIntake = List.filled(7, 0);
     }
 
-    final streakRaw = prefs.getStringList('streak');
-    if (streakRaw != null && streakRaw.length == 7) {
-      _streakHistory = streakRaw.map((e) => int.tryParse(e) ?? 0).toList();
-    } else {
-      _streakHistory = List.filled(7, 0);
-      await prefs.setStringList('streak', _streakHistory.map((e) => e.toString()).toList());
-    }
-
-    _calculateStreak();
     if (mounted) setState(() {});
-  }
-
-  void _calculateStreak() {
-    _streak = _streakHistory.reversed.takeWhile((day) => day == 1).length;
-  }
-
-  Future<void> _checkGoalAndUpdateStreak() async {
-    final intake = widget.intakeNotifier.value;
-    final goal = (widget.goalNotifier.value * 1000).toInt();
-    final now = DateTime.now();
-    final index = now.weekday % 7;
-
-    if (intake >= goal && _streakHistory[index] != 1) {
-      final prefs = await SharedPreferences.getInstance();
-      _streakHistory[index] = 1;
-      await prefs.setStringList(
-        'streak',
-        _streakHistory.map((e) => e.toString()).toList(),
-      );
-      _calculateStreak();
-      if (mounted) setState(() {});
-    }
   }
 
   List<String> get _weekLabels => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -190,14 +156,6 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
               child: IntrinsicHeight(
                 child: Column(
                   children: [
-                    _buildCard(
-                      title: "Current Streak",
-                      value: _streak == 0 ? "0 days 🔥" : "$_streak days 🔥",
-                      valueColor: _streak == 0 ? greyColor : fireColor,
-                      textColor: textColor,
-                      cardColor: cardColor,
-                    ),
-                    const SizedBox(height: 16),
                     _buildCard(
                       title: "Today's Intake",
                       value:
