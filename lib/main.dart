@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:thirsty/services/notification_service.dart';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/stats_screen.dart';
@@ -7,8 +12,26 @@ import 'screens/settings_screen.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
+Future<void> requestExactAlarmPermission() async {
+  final deviceInfo = DeviceInfoPlugin();
+  final androidInfo = await deviceInfo.androidInfo;
+
+  // Android 12+ (SDK 31) needs this permission
+  if (androidInfo.version.sdkInt >= 31) {
+    final intent = AndroidIntent(
+      action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
+    );
+    await intent.launch();
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  await NotificationService.init();
+  await NotificationService.requestPermission();
+  await NotificationService.getToken(); 
+  await requestExactAlarmPermission(); // <- call here
   final app = await HydroBuddyApp.create();
   runApp(app);
 }

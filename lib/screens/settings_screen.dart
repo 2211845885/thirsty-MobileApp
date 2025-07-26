@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/notification_service.dart'; // Adjust import if needed
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest_all.dart' as tzdata;
+import '../services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool isDark;
@@ -25,9 +27,10 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _goalController = TextEditingController();
   final TextEditingController _customSizeController = TextEditingController();
-  final TextEditingController _intervalController = TextEditingController();
+
   late bool _isDarkMode;
   bool _notificationsEnabled = true;
+  TimeOfDay? _selectedTime;
 
   @override
   void initState() {
@@ -43,28 +46,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadNotificationPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool('notificationsEnabled') ?? true;
-    final interval = prefs.getInt('notificationInterval') ?? 120;
+    final hour = prefs.getInt('notificationHour') ?? 8;
+    final minute = prefs.getInt('notificationMinute') ?? 0;
     setState(() {
       _notificationsEnabled = enabled;
-      _intervalController.text = interval.toString();
+      _selectedTime = TimeOfDay(hour: hour, minute: minute);
     });
   }
 
-  Future<void> _saveNotifications() async {
-    final prefs = await SharedPreferences.getInstance();
-    final interval = int.tryParse(_intervalController.text) ?? 120;
-    await prefs.setBool('notificationsEnabled', _notificationsEnabled);
-    await prefs.setInt('notificationInterval', interval);
-    await NotificationService.cancelAll();
-    if (_notificationsEnabled) {
-      await NotificationService.scheduleRepeating(
-        id: 0,
-        title: 'Hydration Reminder',
-        body: 'Time to drink water!',
-        interval: Duration(minutes: interval),
-      );
+  Future<void> _pickTime() async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? const TimeOfDay(hour: 8, minute: 0),
+    );
+
+    if (time != null) {
+      setState(() => _selectedTime = time);
     }
   }
+
+  Future<void> _saveNotifications() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+
+  if (_selectedTime != null) {
+    await prefs.setInt('notificationHour', _selectedTime!.hour);
+    await prefs.setInt('notificationMinute', _selectedTime!.minute);
+  }
+
+  await NotificationService.cancelAll();
+
+  if (_notificationsEnabled && _selectedTime != null) {
+    final now = DateTime.now();
+    var scheduled = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      _selectedTime!.hour,
+      _selectedTime!.minute,
+    );
+
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+
+    final tzTime = tz.TZDateTime.from(scheduled, tz.local);
+
+    try {
+      await NotificationService.scheduleDaily(
+        id: 1,
+        title: 'Hydration Reminder',
+        body: 'Time to drink water!',
+        time: tzTime,
+      );
+    } catch (e) {
+      debugPrint('Error scheduling notification: $e');
+    }
+  }
+}
+
 
   Future<void> _saveGoal() async {
     final prefs = await SharedPreferences.getInstance();
@@ -184,7 +224,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 TextField(
                   controller: _goalController,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     hintText: "e.g. 2500",
                     filled: true,
@@ -284,16 +324,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text("Enable Notifications", style: TextStyle(color: textColor)),
                   activeColor: valueColor,
                 ),
-                TextField(
-                  controller: _intervalController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Interval (minutes)',
-                    filled: true,
-                    fillColor: _isDarkMode ? cardColor : Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ListTile(
+                  title: Text("Notification Time", style: TextStyle(color: textColor)),
+                  subtitle: Text(
+                    _selectedTime?.format(context) ?? 'No time selected',
+                    style: TextStyle(color: valueColor, fontWeight: FontWeight.bold),
                   ),
-                  style: TextStyle(color: textColor),
+                  trailing: Icon(Icons.schedule, color: valueColor),
+                  onTap: _pickTime,
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(

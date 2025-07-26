@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "964923774398",
+    "project_id": "thirsty-wt",
+    "storage_bucket": "thirsty-wt.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:964923774398:android:1001e4afad61a26cb355ef",
+        "android_client_info": {
+          "package_name": "com.example.thirsty"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC332DUU65gPSyXYzgCMWuMYYkExgilj1g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
