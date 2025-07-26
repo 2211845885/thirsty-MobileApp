@@ -175,7 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         backgroundColor: bgColor,
         elevation: 0,
-        title: Text('Settings', style: TextStyle(color: textColor)),
+        title: Text('Settings', style: TextStyle(color: textColor, fontWeight: FontWeight.bold),),
         iconTheme: IconThemeData(color: textColor),
         actions: [
           IconButton(
