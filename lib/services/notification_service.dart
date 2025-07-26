@@ -120,28 +120,28 @@ class NotificationService {
 
   // New method to schedule periodic notifications with fixed intervals
   static Future<void> schedulePeriodicNotification({
-    required int id,
-    required String title,
-    required String body,
-    required RepeatInterval interval, // use flutter_local_notifications enum
-  }) async {
-    await cancel(id);
-    await _notifications.periodicallyShow(
-      id,
-      title,
-      body,
-      interval,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'hydration_channel',
-          'Hydration Reminders',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
+  required int id,
+  required String title,
+  required String body,
+  required RepeatInterval interval,
+}) async {
+  await cancel(id);
+  await _notifications.periodicallyShow(
+    id,
+    title,
+    body,
+    interval,
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'hydration_channel',
+        'Hydration Reminders',
+        importance: Importance.high,
+        priority: Priority.high,
       ),
-      androidAllowWhileIdle: true,
-    );
-  }
+    ),
+    androidAllowWhileIdle: true,
+  );
+}
 
   static Future<void> cancel(int id) async {
     await _notifications.cancel(id);

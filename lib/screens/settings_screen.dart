@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest_all.dart' as tzdata;
-import '../services/notification_service.dart';
+import 'package:thirsty/services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool isDark;
@@ -30,7 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   late bool _isDarkMode;
   bool _notificationsEnabled = true;
-  TimeOfDay? _selectedTime;
+  int _notificationIntervalMinutes = 60;
 
   @override
   void initState() {
@@ -46,65 +45,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadNotificationPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool('notificationsEnabled') ?? true;
-    final hour = prefs.getInt('notificationHour') ?? 8;
-    final minute = prefs.getInt('notificationMinute') ?? 0;
+    final interval = prefs.getInt('notificationInterval') ?? 60;
     setState(() {
       _notificationsEnabled = enabled;
-      _selectedTime = TimeOfDay(hour: hour, minute: minute);
+      _notificationIntervalMinutes = interval;
     });
   }
 
-  Future<void> _pickTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime ?? const TimeOfDay(hour: 8, minute: 0),
-    );
-
-    if (time != null) {
-      setState(() => _selectedTime = time);
-    }
-  }
-
   Future<void> _saveNotifications() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notificationsEnabled', _notificationsEnabled);
+    await prefs.setInt('notificationInterval', _notificationIntervalMinutes);
 
-  if (_selectedTime != null) {
-    await prefs.setInt('notificationHour', _selectedTime!.hour);
-    await prefs.setInt('notificationMinute', _selectedTime!.minute);
-  }
+    await NotificationService.cancelAll();
 
-  await NotificationService.cancelAll();
-
-  if (_notificationsEnabled && _selectedTime != null) {
-    final now = DateTime.now();
-    var scheduled = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      _selectedTime!.hour,
-      _selectedTime!.minute,
-    );
-
-    if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
-    }
-
-    final tzTime = tz.TZDateTime.from(scheduled, tz.local);
-
-    try {
-      await NotificationService.scheduleDaily(
-        id: 1,
-        title: 'Hydration Reminder',
-        body: 'Time to drink water!',
-        time: tzTime,
-      );
-    } catch (e) {
-      debugPrint('Error scheduling notification: $e');
+    if (_notificationsEnabled) {
+      try {
+        await NotificationService.schedulePeriodicNotification(
+          id: 1,
+          title: 'Hydration Reminder',
+          body: 'Time to drink water!',
+          interval: RepeatInterval.everyMinute, 
+        );
+      } catch (e) {
+        debugPrint('Error scheduling notification: $e');
+      }
     }
   }
-}
-
 
   Future<void> _saveGoal() async {
     final prefs = await SharedPreferences.getInstance();
@@ -324,14 +291,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text("Enable Notifications", style: TextStyle(color: textColor)),
                   activeColor: valueColor,
                 ),
-                ListTile(
-                  title: Text("Notification Time", style: TextStyle(color: textColor)),
-                  subtitle: Text(
-                    _selectedTime?.format(context) ?? 'No time selected',
-                    style: TextStyle(color: valueColor, fontWeight: FontWeight.bold),
+                const SizedBox(height: 8),
+                TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Notification interval (minutes)',
+                    hintText: 'e.g. 60',
+                    filled: true,
+                    fillColor: _isDarkMode ? cardColor : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  trailing: Icon(Icons.schedule, color: valueColor),
-                  onTap: _pickTime,
+                  style: TextStyle(color: textColor),
+                  controller: TextEditingController(text: _notificationIntervalMinutes.toString()),
+                  onChanged: (val) {
+                    final parsed = int.tryParse(val);
+                    if (parsed != null && parsed > 0) {
+                      _notificationIntervalMinutes = parsed;
+                    }
+                  },
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
