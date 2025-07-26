@@ -19,7 +19,21 @@ void main() async {
   await Firebase.initializeApp();
   await NotificationService.init();
   await NotificationService.requestPermission();
-  await NotificationService.getToken(); 
+  await NotificationService.getToken();
+
+  final prefs = await SharedPreferences.getInstance();
+  final enabled = prefs.getBool('notificationsEnabled') ?? false;
+  final interval = prefs.getInt('notificationInterval') ?? 60;
+
+  if (enabled) {
+    await NotificationService.startCustomRepeatingNotification(
+      id: 1,
+      title: 'Hydration Reminder',
+      body: 'Time to drink water!',
+      interval: Duration(minutes: interval),
+    );
+  }
+
   final app = await HydroBuddyApp.create();
   runApp(app);
 }
