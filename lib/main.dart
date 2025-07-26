@@ -22,7 +22,7 @@ void main() async {
     await NotificationService.startCustomRepeatingNotification(
       id: 1,
       title: 'Hydration Reminder',
-      body: 'Time to drink water!',
+      body: 'Drink water and stay hydrated!',
       interval: Duration(minutes: interval),
     );
   }

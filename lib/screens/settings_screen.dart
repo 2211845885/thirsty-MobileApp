@@ -57,8 +57,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setBool('notificationsEnabled', _notificationsEnabled);
     await prefs.setInt('notificationInterval', _notificationIntervalMinutes);
 
-    // Stop any existing custom repeating notifications
-    // in _saveNotifications method inside SettingsScreen:
 
     NotificationService.stopCustomRepeatingNotification();
     if (_notificationsEnabled) {
