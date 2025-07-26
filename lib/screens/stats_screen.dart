@@ -76,6 +76,15 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
     }
   }
 
+  // Rotate _weeklyIntake so that Saturday is first
+  void _rotateWeekData() {
+    if (_weeklyIntake.length == 7) {
+      final satValue = _weeklyIntake[6];
+      _weeklyIntake.removeLast();
+      _weeklyIntake.insert(0, satValue);
+    }
+  }
+
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -85,11 +94,13 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
     } else {
       _weeklyIntake = List.filled(7, 0);
     }
+    
+    _rotateWeekData();
 
     if (mounted) setState(() {});
   }
 
-  List<String> get _weekLabels => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  List<String> get _weekLabels => ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
   BarChartGroupData _barData(int index, int value, Color barColor) {
     return BarChartGroupData(
@@ -242,6 +253,34 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
                       textColor: textColor,
                       cardColor: cardColor,
                     ),
+
+                    // Daily Intake Log section starts here
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "Daily Intake Log",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...List.generate(7, (i) {
+                      final day = _weekLabels[i];
+                      final intake = _weeklyIntake[i];
+                      final goalReached = intake >= (widget.goalNotifier.value * 1000).toInt();
+
+                      return _buildDailyLogCard(
+                        day: day,
+                        intake: intake,
+                        goalReached: goalReached,
+                        cardColor: cardColor,
+                        textColor: textColor,
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -292,6 +331,34 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
               fontWeight: FontWeight.bold,
               color: valueColor,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyLogCard({
+    required String day,
+    required int intake,
+    required bool goalReached,
+    required Color cardColor,
+    required Color textColor,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(day, style: TextStyle(color: textColor)),
+          Text("$intake ml", style: TextStyle(color: textColor)),
+          Icon(
+            goalReached ? Icons.check_circle : Icons.cancel,
+            color: goalReached ? Colors.green : Colors.red,
           ),
         ],
       ),
