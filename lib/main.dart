@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:thirsty/services/notification_service.dart';
-import 'package:android_intent_plus/android_intent.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/stats_screen.dart';
@@ -16,10 +12,7 @@ final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<v
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
   await NotificationService.init();
-  await NotificationService.requestPermission();
-  await NotificationService.getToken();
 
   final prefs = await SharedPreferences.getInstance();
   final enabled = prefs.getBool('notificationsEnabled') ?? false;
@@ -34,17 +27,17 @@ void main() async {
     );
   }
 
-  final app = await HydroBuddyApp.create();
+  final app = await thirsty.create();
   runApp(app);
 }
 
-class HydroBuddyApp extends StatefulWidget {
+class thirsty extends StatefulWidget {
   final bool isDark;
   final double goal;
   final int todayIntake;
   final List<int> customSizes;
 
-  const HydroBuddyApp._({
+  const thirsty._({
     Key? key,
     required this.isDark,
     required this.goal,
@@ -61,7 +54,7 @@ class HydroBuddyApp extends StatefulWidget {
     final todayIntake = prefs.getInt('intake_$todayKey') ?? 0;
     final sizes = prefs.getStringList('customSizes')?.map(int.parse).toList() ?? [200, 300, 500];
 
-    return HydroBuddyApp._(
+    return thirsty._(
       isDark: isDark,
       goal: goal,
       todayIntake: todayIntake,
@@ -70,10 +63,11 @@ class HydroBuddyApp extends StatefulWidget {
   }
 
   @override
-  State<HydroBuddyApp> createState() => _HydroBuddyAppState();
+  State<thirsty> createState() => _thirstyState();
 }
 
-class _HydroBuddyAppState extends State<HydroBuddyApp> {
+
+class _thirstyState extends State<thirsty> {
   late bool _isDark;
   late final ValueNotifier<double> _goalNotifier;
   late final ValueNotifier<int> _intakeNotifier;

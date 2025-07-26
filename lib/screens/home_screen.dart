@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import '../main.dart'; // For routeObserver
+import '../main.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -74,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen>
     widget.customSizesNotifier.addListener(_customSizeListener);
 
     _randomizeMessage();
-    _checkNewDay(); // Check/reset on startup
+    _checkNewDay();
     _loadData();
   }
 
@@ -102,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void didPopNext() {
     print("Returned to HomeScreen");
-    _checkNewDay(); // Refresh intake and UI when coming back
+    _checkNewDay();
   }
 
   @override
@@ -188,9 +188,6 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
 
-      streakMap[todayKey] = '1';
-      final newStreakString = streakMap.entries.map((e) => '${e.key}:${e.value}').join(';');
-      await prefs.setString('hydrationStreakMap', newStreakString);
     }
   }
 
@@ -272,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen>
                           painter: DropletPainter(
                             fillPercent: percent,
                             wavePhase: _wavePhase,
-                            goal: goal * 1000, // Pass the goal in ML
+                            goal: goal * 1000,
                           ),
                         ),
                       ),
