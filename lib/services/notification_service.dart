@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 
 class NotificationService {
   static final _notifications = FlutterLocalNotificationsPlugin();
+  static Timer? _customRepeatingTimer;
 
   static Future<void> init() async {
     tzdata.initializeTimeZones();
@@ -15,7 +17,7 @@ class NotificationService {
     const ios = DarwinInitializationSettings();
     const settings = InitializationSettings(android: android, iOS: ios);
     await _notifications.initialize(settings,
-        onDidReceiveNotificationResponse: (payload) {
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
       // handle tap if needed
     });
 
@@ -88,7 +90,6 @@ class NotificationService {
       androidAllowWhileIdle: true,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      // No matchDateTimeComponents means this fires once at `next`
     );
   }
 
@@ -118,30 +119,37 @@ class NotificationService {
     );
   }
 
-  // New method to schedule periodic notifications with fixed intervals
-  static Future<void> schedulePeriodicNotification({
+  static Future<void> startCustomRepeatingNotification({
   required int id,
   required String title,
   required String body,
-  required RepeatInterval interval,
+  required Duration interval,
 }) async {
-  await cancel(id);
-  await _notifications.periodicallyShow(
-    id,
-    title,
-    body,
-    interval,
-    const NotificationDetails(
-      android: AndroidNotificationDetails(
-        'hydration_channel',
-        'Hydration Reminders',
-        importance: Importance.high,
-        priority: Priority.high,
+  stopCustomRepeatingNotification();
+
+
+  _customRepeatingTimer = Timer.periodic(interval, (_) async {
+    await _notifications.show(
+      id,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'hydration_channel',
+          'Hydration Reminders',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
       ),
-    ),
-    androidAllowWhileIdle: true,
-  );
+    );
+  });
 }
+
+
+  static void stopCustomRepeatingNotification() {
+    _customRepeatingTimer?.cancel();
+    _customRepeatingTimer = null;
+  }
 
   static Future<void> cancel(int id) async {
     await _notifications.cancel(id);
@@ -149,6 +157,7 @@ class NotificationService {
 
   static Future<void> cancelAll() async {
     await _notifications.cancelAll();
+    stopCustomRepeatingNotification();
   }
 
   static Future<void> getToken() async {

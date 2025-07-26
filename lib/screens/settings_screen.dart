@@ -57,25 +57,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setBool('notificationsEnabled', _notificationsEnabled);
     await prefs.setInt('notificationInterval', _notificationIntervalMinutes);
 
-    await NotificationService.cancelAll();
+    // Stop any existing custom repeating notifications
+    // in _saveNotifications method inside SettingsScreen:
 
+    NotificationService.stopCustomRepeatingNotification();
     if (_notificationsEnabled) {
-      try {
-        await NotificationService.schedulePeriodicNotification(
-          id: 1,
-          title: 'Hydration Reminder',
-          body: 'Time to drink water!',
-          interval: RepeatInterval.everyMinute, 
-        );
-      } catch (e) {
-        debugPrint('Error scheduling notification: $e');
-      }
+      await NotificationService.startCustomRepeatingNotification(
+        id: 1,
+        title: 'Hydration Reminder',
+        body: 'Time to drink water!',
+        interval: Duration(minutes: _notificationIntervalMinutes),
+      );
     }
   }
 
   Future<void> _saveGoal() async {
     final prefs = await SharedPreferences.getInstance();
-    double goal = double.tryParse(_goalController.text) ?? widget.goalNotifier.value;
+    double goal =
+        double.tryParse(_goalController.text) ?? widget.goalNotifier.value;
     goal = goal.clamp(0.5, 10.0);
     widget.goalNotifier.value = goal;
     await prefs.setDouble('goal', goal);
@@ -90,14 +89,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
       widget.customSizesNotifier.value = sizes;
       _customSizeController.clear();
     });
-    await prefs.setStringList('customSizes', sizes.map((e) => e.toString()).toList());
+    await prefs.setStringList(
+      'customSizes',
+      sizes.map((e) => e.toString()).toList(),
+    );
   }
 
   Future<void> _removeCustomSize(int size) async {
     final prefs = await SharedPreferences.getInstance();
-    final sizes = widget.customSizesNotifier.value.where((e) => e != size).toList();
+    final sizes = widget.customSizesNotifier.value
+        .where((e) => e != size)
+        .toList();
     setState(() => widget.customSizesNotifier.value = sizes);
-    await prefs.setStringList('customSizes', sizes.map((e) => e.toString()).toList());
+    await prefs.setStringList(
+      'customSizes',
+      sizes.map((e) => e.toString()).toList(),
+    );
   }
 
   Future<void> _resetData() async {
@@ -108,10 +115,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.intakeNotifier.value = 0;
     _goalController.text = "2000";
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("All data has been reset.")),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("All data has been reset.")));
   }
+
 
   Widget _buildCard({
     required String title,
@@ -155,7 +163,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final bgColor = _isDarkMode ? const Color(0xFF0A192F) : Colors.white;
-    final cardColor = _isDarkMode ? const Color(0xFF1E2A47) : const Color(0xFFE3F2FD);
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1E2A47)
+        : const Color(0xFFE3F2FD);
     final textColor = _isDarkMode ? Colors.white : Colors.black;
     final valueColor = _isDarkMode ? Colors.lightBlueAccent : Colors.blue;
     final errorColor = Colors.redAccent;
@@ -191,7 +201,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 TextField(
                   controller: _goalController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     hintText: "e.g. 2500",
                     filled: true,
@@ -205,7 +217,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: _saveGoal,
-                  child: const Text('Save Goal', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Save Goal',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: valueColor,
                     foregroundColor: Colors.white,
@@ -229,6 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Row(
                   children: [
                     Expanded(
+
                       child: TextField(
                         controller: _customSizeController,
                         keyboardType: TextInputType.number,
@@ -253,7 +269,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                       ),
                       child: const Icon(Icons.add),
                     ),
@@ -264,7 +283,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   spacing: 8,
                   children: widget.customSizesNotifier.value.map((size) {
                     return Chip(
-                      label: Text("$size ml", style: const TextStyle(color: Colors.white)),
+                      label: Text(
+                        "$size ml",
+                        style: const TextStyle(color: Colors.white),
+                      ),
                       backgroundColor: valueColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
@@ -287,8 +309,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 SwitchListTile(
                   value: _notificationsEnabled,
-                  onChanged: (val) => setState(() => _notificationsEnabled = val),
-                  title: Text("Enable Notifications", style: TextStyle(color: textColor)),
+                  onChanged: (val) =>
+                      setState(() => _notificationsEnabled = val),
+                  title: Text(
+                    "Enable Notifications",
+                    style: TextStyle(color: textColor),
+                  ),
                   activeColor: valueColor,
                 ),
                 const SizedBox(height: 8),
@@ -304,7 +330,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   style: TextStyle(color: textColor),
-                  controller: TextEditingController(text: _notificationIntervalMinutes.toString()),
+                  controller: TextEditingController(
+                    text: _notificationIntervalMinutes.toString(),
+                  ),
                   onChanged: (val) {
                     final parsed = int.tryParse(val);
                     if (parsed != null && parsed > 0) {
@@ -315,6 +343,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: _saveNotifications,
+
                   style: ElevatedButton.styleFrom(
                     backgroundColor: valueColor,
                     foregroundColor: Colors.white,

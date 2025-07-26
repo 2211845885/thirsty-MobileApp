@@ -12,18 +12,7 @@ import 'screens/settings_screen.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
-Future<void> requestExactAlarmPermission() async {
-  final deviceInfo = DeviceInfoPlugin();
-  final androidInfo = await deviceInfo.androidInfo;
 
-  // Android 12+ (SDK 31) needs this permission
-  if (androidInfo.version.sdkInt >= 31) {
-    final intent = AndroidIntent(
-      action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
-    );
-    await intent.launch();
-  }
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,7 +20,6 @@ void main() async {
   await NotificationService.init();
   await NotificationService.requestPermission();
   await NotificationService.getToken(); 
-  await requestExactAlarmPermission(); // <- call here
   final app = await HydroBuddyApp.create();
   runApp(app);
 }
@@ -133,6 +121,7 @@ class HomePage extends StatefulWidget {
 
   final Future<void> Function(int) updateIntake;
   final Future<void> Function(double) updateGoal;
+
 
   const HomePage({
     super.key,
