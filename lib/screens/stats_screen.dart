@@ -137,14 +137,7 @@ class _StatsScreenState extends State<StatsScreen> with WidgetsBindingObserver {
             ),
             onPressed: () => widget.onToggleTheme(!widget.isDark),
             tooltip: "Toggle Theme",
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh, color: textColor),
-            tooltip: 'Refresh Stats',
-            onPressed: () async {
-              await _loadData();
-            },
-          ),
+          )
         ],
       ),
       body: LayoutBuilder(
