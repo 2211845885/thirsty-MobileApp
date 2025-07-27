@@ -53,6 +53,7 @@ class NotificationService {
     _customRepeatingTimer = null;
   }
 
+  
   static Future<void> cancel(int id) async {
     await _notifications.cancel(id);
   }
@@ -61,5 +62,5 @@ class NotificationService {
     await _notifications.cancelAll();
     stopCustomRepeatingNotification();
   }
-
+  
 }

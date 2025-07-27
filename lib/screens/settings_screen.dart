@@ -37,7 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _isDarkMode = widget.isDark;
     _goalController.text = widget.goalNotifier.value.toString();
     if (widget.customSizesNotifier.value.isEmpty) {
-      widget.customSizesNotifier.value = [150, 250, 350];
+      widget.customSizesNotifier.value = [200, 300, 500];
     }
     _loadNotificationPrefs();
   }
@@ -63,7 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await NotificationService.startCustomRepeatingNotification(
         id: 1,
         title: 'Hydration Reminder',
-        body: 'Time to drink water!',
+        body: 'Drink water and stay hydrated!',
         interval: Duration(minutes: _notificationIntervalMinutes),
       );
     }
