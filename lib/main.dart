@@ -12,6 +12,7 @@ final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<v
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  NotificationService.requestPermission();
   await NotificationService.init();
 
   final prefs = await SharedPreferences.getInstance();
